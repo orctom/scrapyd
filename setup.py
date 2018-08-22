@@ -48,6 +48,7 @@ if using_setuptools:
         'Scrapy>=1.0',
         'six',
         'enum-compat',
+        'redis',
     ]
     setup_args['entry_points'] = {'console_scripts': [
         'scrapyd = scrapyd.scripts.scrapyd_run:main'

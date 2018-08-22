@@ -3,6 +3,12 @@ from twisted.application.internet import TimerService, TCPServer
 from twisted.web import server
 from twisted.python import log
 
+import traceback
+import socket
+import redis
+import requests
+import json
+
 from scrapy.utils.misc import load_object
 
 from .interfaces import IEggStorage, IPoller, ISpiderScheduler, IEnvironment
@@ -11,6 +17,7 @@ from .scheduler import SpiderScheduler
 from .poller import QueuePoller
 from .environ import Environment
 from .config import Config
+
 
 def application(config):
     app = Application("Scrapyd")
@@ -36,7 +43,8 @@ def application(config):
     webcls = load_object(webpath)
 
     timer = TimerService(poll_interval, poller.poll)
-    webservice = TCPServer(http_port, server.Site(webcls(config, app)), interface=bind_address)
+    webservice = TCPServer(http_port, server.Site(
+        webcls(config, app)), interface=bind_address)
     log.msg(format="Scrapyd web console available at http://%(bind_address)s:%(http_port)s/",
             bind_address=bind_address, http_port=http_port)
 
@@ -44,4 +52,56 @@ def application(config):
     timer.setServiceParent(app)
     webservice.setServiceParent(app)
 
+    register_timer = TimerService(30, register_to_redis, config)
+    register_timer.setServiceParent(app)
+
     return app
+
+
+def hello(config):
+    log.msg('hello function {}'.format(config.get('launcher', '')))
+
+
+def register_to_redis(config):
+    try:
+        redis_host = config.get('redis_host', 'localhost')
+        redis_port = config.get('redis_port', 6379)
+        redis_db = config.get('redis_db', 1)
+        redis_key = config.get('redis_key', 'scrapyd.nodes')
+        host_ip = get_host_ip(config)
+        if host_ip is None:
+            host_name = socket.gethostname()
+            message = '"host_ip" is not configured, scrapyd [{}] not registered'.format(
+                host_name)
+            log.msg(message)
+            if config.get('notify', False):
+                notify(config, message)
+            return
+        r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+        if r.sadd(redis_key, get_host_ip(config)):
+            log.msg('Scrapyd [{}] registered to redis {}:{} at db {}'.format(
+                host_ip, redis_host, redis_port, redis_db))
+    except Exception as err:
+        log.msg(err)
+        message = traceback.format_exc()
+        notify(config, message)
+
+
+def get_host_ip(config):
+    _ip = None
+    try:
+        _ip = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(
+            ('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    except Exception as err:
+        log.msg(err)
+    return config.get('host_ip', _ip)
+
+
+def notify(config, message):
+    key = config.get('notify_key', '')
+    if key == '':
+        return
+    url = 'https://hooks.slack.com/services/{}'.format(key)
+    headers = {'content-type': 'application/json'}
+    payload = {'text': message}
+    response = requests.post(url, data=json.dumps(payload), headers=headers)
