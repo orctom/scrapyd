@@ -49,6 +49,7 @@ if using_setuptools:
         'six',
         'enum-compat',
         'redis',
+        'psutil',
     ]
     setup_args['entry_points'] = {'console_scripts': [
         'scrapyd = scrapyd.scripts.scrapyd_run:main'

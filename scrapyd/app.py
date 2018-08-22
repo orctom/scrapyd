@@ -5,6 +5,7 @@ from twisted.python import log
 
 import traceback
 import socket
+import psutil
 import redis
 import requests
 import json
@@ -52,6 +53,7 @@ def application(config):
     timer.setServiceParent(app)
     webservice.setServiceParent(app)
 
+    register_to_redis(config)
     register_timer = TimerService(30, register_to_redis, config)
     register_timer.setServiceParent(app)
 
@@ -78,7 +80,8 @@ def register_to_redis(config):
                 notify(config, message)
             return
         r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
-        if r.sadd(redis_key, get_host_ip(config)):
+        mem_free = int(psutil.virtual_memory().available / 1048576)
+        if r.hset(redis_key, get_host_ip(config), mem_free):
             log.msg('Scrapyd [{}] registered to redis {}:{} at db {}'.format(
                 host_ip, redis_host, redis_port, redis_db))
     except Exception as err:
