@@ -53,23 +53,33 @@ def application(config):
     timer.setServiceParent(app)
     webservice.setServiceParent(app)
 
-    register_to_redis(config)
-    register_timer = TimerService(30, register_to_redis, config)
+    host = get_host_ip(config)
+    redis_host = config.get('redis_host', 'localhost')
+    redis_port = config.get('redis_port', 6379)
+    redis_db = config.get('redis_db', 0)
+    redis_pool = redis.ConnectionPool(
+        host=redis_host,
+        port=redis_port,
+        db=redis_db
+    )
+    register_to_redis(config, redis_pool)
+    log.msg('Regesting scrapyd [{}] to redis {}:{} at db {}'.format(
+        host, redis_host, redis_port, redis_db))
+    redis_interval = config.getfloat('redis_interval', 5)
+    register_timer = TimerService(
+        redis_interval, register_to_redis, config, redis_pool)
     register_timer.setServiceParent(app)
 
     return app
 
 
-def hello(config):
-    log.msg('hello function {}'.format(config.get('launcher', '')))
+failure_count = 0
 
 
-def register_to_redis(config):
+def register_to_redis(config, redis_pool):
+    global failure_count
     try:
-        redis_host = config.get('redis_host', 'localhost')
-        redis_port = config.get('redis_port', 6379)
-        redis_db = config.get('redis_db', 1)
-        redis_key = config.get('redis_key', 'scrapyd.nodes')
+        redis_key = config.get('redis_key', 'scrapyd:nodes')
         host_ip = get_host_ip(config)
         if host_ip is None:
             host_name = socket.gethostname()
@@ -79,15 +89,20 @@ def register_to_redis(config):
             if config.get('notify', False):
                 notify(config, message)
             return
-        r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+        host_port = config.get('http_port', 6800)
+        host = '{}:{}'.format(host_ip, host_port)
         mem_free = int(psutil.virtual_memory().available / 1048576)
-        if r.hset(redis_key, get_host_ip(config), mem_free):
-            log.msg('Scrapyd [{}] registered to redis {}:{} at db {}'.format(
-                host_ip, redis_host, redis_port, redis_db))
+
+        r = redis.Redis(connection_pool=redis_pool)
+        if r.hset(redis_key, host, mem_free):
+            log.msg('Scrapyd [{}] registered to redis again.'.format(host))
+        failure_count = 0
     except Exception as err:
+        failure_count += 1
         log.msg(err)
         message = traceback.format_exc()
-        notify(config, message)
+        if failure_count < 10:
+            notify(config, message)
 
 
 def get_host_ip(config):
@@ -107,4 +122,4 @@ def notify(config, message):
     url = 'https://hooks.slack.com/services/{}'.format(key)
     headers = {'content-type': 'application/json'}
     payload = {'text': message}
-    response = requests.post(url, data=json.dumps(payload), headers=headers)
+    requests.post(url, data=json.dumps(payload), headers=headers)
