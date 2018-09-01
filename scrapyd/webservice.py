@@ -10,6 +10,7 @@ from twisted.python import log
 
 from .utils import get_spider_list, JsonResource, UtilsCache, native_stringify_dict
 
+
 class WsResource(JsonResource):
 
     def __init__(self, root):
@@ -26,6 +27,7 @@ class WsResource(JsonResource):
             r = {"node_name": self.root.nodename, "status": "error", "message": str(e)}
             return self.render_object(r, txrequest).encode('utf-8')
 
+
 class DaemonStatus(WsResource):
 
     def render_GET(self, txrequest):
@@ -33,7 +35,13 @@ class DaemonStatus(WsResource):
         running = len(self.root.launcher.processes)
         finished = len(self.root.launcher.finished)
 
-        return {"node_name": self.root.nodename, "status":"ok", "pending": pending, "running": running, "finished": finished}
+        return {
+            "node_name": self.root.nodename,
+            "status": "ok",
+            "pending": pending,
+            "running": running,
+            "finished": finished
+        }
 
 
 class Schedule(WsResource):
