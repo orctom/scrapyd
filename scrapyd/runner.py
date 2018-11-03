@@ -8,6 +8,7 @@ from scrapyd import get_application
 from scrapyd.interfaces import IEggStorage
 from scrapyd.eggutils import activate_egg
 
+
 @contextmanager
 def project_environment(project):
     app = get_application()
@@ -30,11 +31,13 @@ def project_environment(project):
         if eggpath:
             os.remove(eggpath)
 
+
 def main():
     project = os.environ['SCRAPY_PROJECT']
     with project_environment(project):
         from scrapy.cmdline import execute
         execute()
+
 
 if __name__ == '__main__':
     main()

@@ -10,6 +10,7 @@ from scrapyd.utils import get_crawl_args, native_stringify_dict
 from scrapyd import __version__
 from .interfaces import IPoller, IEnvironment
 
+
 class Launcher(Service):
 
     name = 'launcher'
@@ -41,8 +42,7 @@ class Launcher(Service):
         e = self.app.getComponent(IEnvironment)
         env = e.get_environment(msg, slot)
         env = native_stringify_dict(env, keys_only=False)
-        pp = ScrapyProcessProtocol(slot, project, msg['_spider'], \
-            msg['_job'], env)
+        pp = ScrapyProcessProtocol(slot, project, msg['_spider'], msg['_job'], env, msg.get('data'))
         pp.deferred.addBoth(self._process_finished, slot)
         reactor.spawnProcess(pp, sys.executable, args=args, env=env)
         self.processes[slot] = pp
@@ -64,9 +64,10 @@ class Launcher(Service):
             max_proc = cpus * config.getint('max_proc_per_cpu', 4)
         return max_proc
 
+
 class ScrapyProcessProtocol(protocol.ProcessProtocol):
 
-    def __init__(self, slot, project, spider, job, env):
+    def __init__(self, slot, project, spider, job, env, data):
         self.slot = slot
         self.pid = None
         self.project = project
@@ -75,14 +76,17 @@ class ScrapyProcessProtocol(protocol.ProcessProtocol):
         self.start_time = datetime.now()
         self.end_time = None
         self.env = env
+        self.data = data
         self.logfile = env.get('SCRAPY_LOG_FILE')
         self.itemsfile = env.get('SCRAPY_FEED_URI')
         self.deferred = defer.Deferred()
 
     def outReceived(self, data):
+        # log.msg(data.rstrip())
         log.msg(data.rstrip(), system="Launcher,%d/stdout" % self.pid)
 
     def errReceived(self, data):
+        # log.msg(data.rstrip())
         log.msg(data.rstrip(), system="Launcher,%d/stderr" % self.pid)
 
     def connectionMade(self):

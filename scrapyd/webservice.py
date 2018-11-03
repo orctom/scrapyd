@@ -128,7 +128,7 @@ class ListJobs(WsResource):
         spiders = self.root.launcher.processes.values()
         queues = self.root.poller.queues
         pending = [
-            {"project": project, "spider": x["name"], "id": x["_job"]}
+            {"project": project, "spider": x["name"], "id": x["_job"], "data": x.get("data")}
             for qname in (queues if project is None else [project])
             for x in queues[qname].list()
         ]
@@ -138,6 +138,7 @@ class ListJobs(WsResource):
                 "spider": s.spider,
                 "id": s.job, "pid": s.pid,
                 "start_time": str(s.start_time),
+                "data": s.data,
             } for s in spiders if project is None or s.project == project
         ]
         finished = [
@@ -145,7 +146,8 @@ class ListJobs(WsResource):
                 "project": project,
                 "spider": s.spider, "id": s.job,
                 "start_time": str(s.start_time),
-                "end_time": str(s.end_time)
+                "end_time": str(s.end_time),
+                "data": s.data,
             } for s in self.root.launcher.finished
             if project is None or s.project == project
         ]

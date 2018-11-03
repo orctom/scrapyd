@@ -6,6 +6,7 @@ from os.path import expanduser
 
 from scrapy.utils.conf import closest_scrapy_cfg
 
+
 class Config(object):
     """A ConfigParser wrapper to support defaults when calling instance
     methods, and also tied to a single section"""

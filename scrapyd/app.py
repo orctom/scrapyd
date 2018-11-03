@@ -63,8 +63,8 @@ def application(config):
         db=redis_db
     )
     register_to_redis(config, redis_pool)
-    log.msg('Regesting scrapyd [{}] to redis {}:{} at db {}'.format(
-        host, redis_host, redis_port, redis_db))
+    log.msg('Registering scrapyd [{}] to redis {}:{} at db {}'.format(host, redis_host, redis_port, redis_db))
+    # log.msg('2018-11-03 10:10 am')
     redis_interval = config.getfloat('redis_interval', 5)
     register_timer = TimerService(
         redis_interval, register_to_redis, config, redis_pool)

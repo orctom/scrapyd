@@ -5,6 +5,7 @@ from twisted.internet.defer import DeferredQueue, inlineCallbacks, maybeDeferred
 from .utils import get_spider_queues
 from .interfaces import IPoller
 
+
 @implementer(IPoller)
 class QueuePoller(object):
 
