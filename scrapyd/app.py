@@ -1,3 +1,6 @@
+import multiprocessing
+import os
+
 from twisted.application.service import Application
 from twisted.application.internet import TimerService, TCPServer
 from twisted.web import server
@@ -17,7 +20,6 @@ from .eggstorage import FilesystemEggStorage
 from .scheduler import SpiderScheduler
 from .poller import QueuePoller
 from .environ import Environment
-from .config import Config
 
 
 def application(config):
@@ -92,9 +94,12 @@ def register_to_redis(config, redis_pool):
         host_port = config.get('http_port', 6800)
         host = '{}:{}'.format(host_ip, host_port)
         mem_free = int(psutil.virtual_memory().available / 1048576)
+        cpu_load = os.getloadavg()[0]
+        n_cpu = multiprocessing.cpu_count()
+        value = f"{mem_free}|{cpu_load}|{n_cpu}"
 
         r = redis.Redis(connection_pool=redis_pool)
-        if r.hset(redis_key, host, mem_free):
+        if r.hset(redis_key, host, value):
             log.msg('Scrapyd [{}] registered to redis again.'.format(host))
         failure_count = 0
     except Exception as err:
